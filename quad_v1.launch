@@ -1,0 +1,5 @@
+<launch>
+  <node name="ssc32_node" pkg="lynxmotion_ssc32" type="ssc32_node">
+    <rosparam command="load" file="$(find dragoon_quad)/config/quad.conf" />
+  </node>
+</launch>
