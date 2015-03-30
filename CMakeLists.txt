@@ -81,7 +81,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ik
+  LIBRARIES ik DragoonLeg
   CATKIN_DEPENDS roscpp std_msgs
   DEPENDS system_lib
 )
@@ -102,6 +102,10 @@ add_library(ik
   src/ik.cpp
 )
 
+add_library(DragoonLeg
+    src/DragoonLeg.cpp
+)
+
 ## Declare a cpp executable
 add_executable(dragoon_node src/dragoon_node.cpp)
 
@@ -111,7 +115,7 @@ add_executable(dragoon_node src/dragoon_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(dragoon_node
-  ik ${catkin_LIBRARIES}
+    DragoonLeg ik ${catkin_LIBRARIES}
 )
 
 #############
