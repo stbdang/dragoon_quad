@@ -3,6 +3,56 @@
 #include "trajectory_msgs/JointTrajectory.h"
 #include "DragoonLeg.h"
 
+struct LegOffset
+{
+    double x;
+    double y;
+    double z;
+};
+
+static struct LegOffset offset[4];
+
+void step_layer_0(int count)
+{
+    double delta = 20;
+    double high = -40;
+    switch (count) {
+        case 0:
+            for (int i = 0; i < 4; i++ ) {
+                offset[i].x = -delta;
+                offset[i].y = -delta;
+                offset[i].z = 0;
+            }
+            offset[0].z = high;
+            break;
+        case 4:
+            for (int i = 0; i < 4; i++ ) {
+                offset[i].x = delta;
+                offset[i].y = -delta;
+                offset[i].z = 0;
+            }
+            offset[1].z = high;
+            break;
+        case 6:
+            for (int i = 0; i < 4; i++ ) {
+                offset[i].x = -delta;
+                offset[i].y = delta;
+                offset[i].z = 0;
+            }
+            offset[2].z = high;
+            break;
+        case 2:
+            for (int i = 0; i < 4; i++ ) {
+                offset[i].x = delta;
+                offset[i].y = delta;
+                offset[i].z = 0;
+            }
+            offset[3].z = high;
+            break;
+    }
+
+}
+
 int main( int argc, char** argv )
 {
     ros::init( argc, argv, "dragoon_node" );
@@ -63,60 +113,11 @@ int main( int argc, char** argv )
 
     
     int count = 0;
-    double delta = 15;
-    double high = -40;
     double dur = 0.5;
     while (nh.ok() ) {
-        switch (count) {
-            case 0:
-                legs[0]->moveRelative(-delta, -delta, high, dur);
-                legs[1]->moveRelative(-delta, -delta, 0,    dur);
-                legs[2]->moveRelative(-delta, -delta, 0,    dur);
-                legs[3]->moveRelative(-delta, -delta, 0,    dur);
-                break;
-            case 1:
-                legs[0]->moveRelative(0,    0,      0,      dur);
-                legs[1]->moveRelative(0,    0,      0,      dur);
-                legs[2]->moveRelative(0,    0,      0,      dur);
-                legs[3]->moveRelative(0,    0,      0,      dur);
-                break;
-            case 2:
-                legs[0]->moveRelative(delta, -delta, 0,     dur);
-                legs[1]->moveRelative(delta, -delta, high,  dur);
-                legs[2]->moveRelative(delta, -delta, 0,     dur);
-                legs[3]->moveRelative(delta, -delta, 0,     dur);
-                break;
-            case 3:
-                legs[0]->moveRelative(0,    0,      0,      dur);
-                legs[1]->moveRelative(0,    0,      0,      dur);
-                legs[2]->moveRelative(0,    0,      0,      dur);
-                legs[3]->moveRelative(0,    0,      0,      dur);
-                break;
-            case 4:
-                legs[0]->moveRelative(-delta,  delta, 0,    dur);
-                legs[1]->moveRelative(-delta,  delta, 0,    dur);
-                legs[2]->moveRelative(-delta,  delta, high, dur);
-                legs[3]->moveRelative(-delta,  delta, 0,    dur);
-                break;
-            case 5:
-                legs[0]->moveRelative(0,    0,      0,      dur);
-                legs[1]->moveRelative(0,    0,      0,      dur);
-                legs[2]->moveRelative(0,    0,      0,      dur);
-                legs[3]->moveRelative(0,    0,      0,      dur);
-                break;
-            case 6:
-                legs[0]->moveRelative( delta,  delta, 0,    dur);
-                legs[1]->moveRelative( delta,  delta, 0,    dur);
-                legs[2]->moveRelative( delta,  delta, 0,    dur);
-                legs[3]->moveRelative( delta,  delta, high, dur);
-                break;
-            case 7:
-                legs[0]->moveRelative(0,    0,      0,      dur);
-                legs[1]->moveRelative(0,    0,      0,      dur);
-                legs[2]->moveRelative(0,    0,      0,      dur);
-                legs[3]->moveRelative(0,    0,      0,      dur);
-                break;
-        }
+        memset(offset, 0, sizeof(offset));
+        
+        step_layer_0(count);
 
         ros::spinOnce();
         rate.sleep();
