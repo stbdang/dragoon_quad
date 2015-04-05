@@ -17,7 +17,8 @@ void step_layer_0(int count)
     double delta = 20;
     double high = -40;
     switch (count) {
-        case 0:
+        // Leg 1
+        case 6:
             for (int i = 0; i < 4; i++ ) {
                 offset[i].x = -delta;
                 offset[i].y = -delta;
@@ -25,7 +26,8 @@ void step_layer_0(int count)
             }
             offset[0].z = high;
             break;
-        case 4:
+        // Leg 2
+        case 2:
             for (int i = 0; i < 4; i++ ) {
                 offset[i].x = delta;
                 offset[i].y = -delta;
@@ -33,7 +35,8 @@ void step_layer_0(int count)
             }
             offset[1].z = high;
             break;
-        case 6:
+        // Leg 3
+        case 0:
             for (int i = 0; i < 4; i++ ) {
                 offset[i].x = -delta;
                 offset[i].y = delta;
@@ -41,7 +44,8 @@ void step_layer_0(int count)
             }
             offset[2].z = high;
             break;
-        case 2:
+        // Leg 4
+        case 4:
             for (int i = 0; i < 4; i++ ) {
                 offset[i].x = delta;
                 offset[i].y = delta;
@@ -49,6 +53,32 @@ void step_layer_0(int count)
             }
             offset[3].z = high;
             break;
+    }
+
+}
+
+void step_layer_1(int leg, int count)
+{
+    // leg order : 3, 2, 4, 1
+
+    switch (leg) {
+        case 1:
+            count = ( count + 6 ) % 8;
+            break;
+        case 3:
+            count = ( count + 4 ) % 8;
+            break;
+        case 0:
+            count = ( count + 2 ) % 8;
+            break;
+    }
+
+    double step_size = 20;
+    if ( count < 2 ) {
+        offset[leg].y += (step_size / 2) * (count+1);
+    } else {
+        count = count - 2;
+        offset[leg].y += (-step_size / 6) * (count+1);
     }
 
 }
@@ -120,6 +150,7 @@ int main( int argc, char** argv )
         step_layer_0(count);
 
         for (int i=0; i < 4; i++ ) {
+            step_layer_1(i, count);
             legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
         }
 
