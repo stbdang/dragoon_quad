@@ -119,6 +119,11 @@ int main( int argc, char** argv )
         
         step_layer_0(count);
 
+        for (int i=0; i < 4; i++ ) {
+            legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
+        }
+
+
         ros::spinOnce();
         rate.sleep();
         count = (count + 1 ) %8;
