@@ -40,7 +40,7 @@ int DragoonLeg::moveRelative(double x, double y, double z, double duration)
 int DragoonLeg::moveAbsolute(double x, double y, double z, double duration)
 {
     double theta1, theta2, theta3;
-    ROS_INFO("Move leg %d to %f, %f, %f", id+1, x, y, z);
+    ROS_DEBUG("Move leg %d to %f, %f, %f", id+1, x, y, z);
     trajectory_msgs::JointTrajectory legCommand;
     trajectory_msgs::JointTrajectoryPoint legPosition;
     legCommand.joint_names.resize(3);
@@ -55,7 +55,7 @@ int DragoonLeg::moveAbsolute(double x, double y, double z, double duration)
 
 
     if ( getTheta( x, y, z, theta1, theta2, theta3) == 0 ) {
-        ROS_INFO("t1 = %f, t2 = %f, t3 = %f", theta1, theta2, theta3);
+        ROS_DEBUG("t1 = %f, t2 = %f, t3 = %f", theta1, theta2, theta3);
         legCommand.header.stamp = ros::Time::now();
         legCommand.header.frame_id = "leg_base";
 
@@ -67,7 +67,7 @@ int DragoonLeg::moveAbsolute(double x, double y, double z, double duration)
         legCommand.points[0] = legPosition;
         legCommand.points[0].time_from_start = ros::Duration(duration);
 
-        ROS_INFO("Publish to %s", _legPublisher.getTopic().c_str());
+        ROS_DEBUG("Publish to %s", _legPublisher.getTopic().c_str());
         _legPublisher.publish(legCommand);
         return 0;
     }

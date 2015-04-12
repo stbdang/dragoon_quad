@@ -3,6 +3,8 @@
 #include "trajectory_msgs/JointTrajectory.h"
 #include "DragoonLeg.h"
 
+#define PI 3.14159265
+
 struct LegOffset
 {
     double x;
@@ -11,74 +13,144 @@ struct LegOffset
 };
 
 static struct LegOffset offset[4];
+static int legorder[4];
+static int numPhase = 10;
 
-void step_layer_0(int count)
+void step_layer_0(int count, double direction)
 {
     double delta = 20;
     double high = -40;
-    switch (count) {
-        // Leg 1
-        case 6:
-            for (int i = 0; i < 4; i++ ) {
-                offset[i].x = -delta;
-                offset[i].y = -delta;
-                offset[i].z = 0;
-            }
-            offset[0].z = high;
-            break;
+
+    int legside[4];
+    int lean[numPhase];
+    // 0 : 3 2 4 1
+    // 90 : 4 1 2 3
+    // 180 : 2 3 1 4
+    // 270 : 1 4 3 2
+
+    if ( direction < 0 || direction >= 360 ) {
+        ROS_ERROR("Invalid direction");
+        return;
+    }
+
+    lean[0]= -1; 
+    lean[1]= -1;
+    lean[2]= 1;
+    lean[3]= 1;
+    lean[4]= 1;
+    lean[5]= 1;
+    lean[6]= 1;
+    lean[7]= -1;
+    lean[8]= -1;
+    lean[9]= -1;
+
+    if ( direction > 315 || direction < 45 ) {
+        legorder[0] = 8;
+        legorder[1] = 3;
+        legorder[2] = 0;
+        legorder[3] = 5;
+        
+    } else if (direction < 135) {
+        legorder[0] = 3;
+        legorder[1] = 5;
+        legorder[2] = 8;
+        legorder[3] = 0;
+    } else if (direction < 225) {
+        legorder[0] = 5;
+        legorder[1] = 0;
+        legorder[2] = 3;
+        legorder[3] = 8;
+    } else {
+        legorder[0] = 0;
+        legorder[1] = 8;
+        legorder[2] = 5;
+        legorder[3] = 3;
+    }
+#if 0
+// Simple opposite to lifting leg
+    if ( count == legorder[0]*2 ) {
+        //LEG 1
+        for (int i = 0; i < 4; i++ ) {
+            offset[i].x = -delta;
+            offset[i].y = -delta;
+            offset[i].z = 0;
+        }
+        offset[0].z = high;
+    } else if ( count == legorder[1]*2 ) {
         // Leg 2
-        case 2:
-            for (int i = 0; i < 4; i++ ) {
-                offset[i].x = delta;
-                offset[i].y = -delta;
-                offset[i].z = 0;
-            }
-            offset[1].z = high;
-            break;
+        for (int i = 0; i < 4; i++ ) {
+            offset[i].x = delta;
+            offset[i].y = -delta;
+            offset[i].z = 0;
+        }
+        offset[1].z = high;
+    } else if ( count == legorder[2]*2 ) {
         // Leg 3
-        case 0:
-            for (int i = 0; i < 4; i++ ) {
-                offset[i].x = -delta;
-                offset[i].y = delta;
-                offset[i].z = 0;
-            }
-            offset[2].z = high;
-            break;
+        for (int i = 0; i < 4; i++ ) {
+            offset[i].x = -delta;
+            offset[i].y = delta;
+            offset[i].z = 0;
+        }
+        offset[2].z = high;
+    } else if ( count == legorder[3]*2 ) {
         // Leg 4
-        case 4:
-            for (int i = 0; i < 4; i++ ) {
-                offset[i].x = delta;
-                offset[i].y = delta;
-                offset[i].z = 0;
-            }
-            offset[3].z = high;
-            break;
+        for (int i = 0; i < 4; i++ ) {
+            offset[i].x = delta;
+            offset[i].y = delta;
+            offset[i].z = 0;
+        }
+        offset[3].z = high;
+    }
+#endif
+
+    // lateral movement perpendicular to the direction of walk
+    double rightAngle = ( direction + 90.0 );
+    rightAngle = (rightAngle > 360.0) ? rightAngle - 360.0 : rightAngle;
+    double dX = delta * sin( rightAngle * PI/180.0);
+    double dY = delta * cos( rightAngle * PI/180.0);
+    int legToLift = -1;
+
+    if ( count == legorder[0] ) {
+        //LEG 1
+        legToLift = 0;
+    } else if ( count == legorder[1] ) {
+        // Leg 2
+        legToLift = 1;
+    } else if ( count == legorder[2] ) {
+        // Leg 3
+        legToLift = 2;
+    } else if ( count == legorder[3] ) {
+        // Leg 4
+        legToLift = 3;
+    }
+
+    for (int i = 0; i < 4; i++ ) {
+        offset[i].x = lean[count]*dX;
+        offset[i].y = lean[count]*dY;
+        offset[i].z = 0;
+    }
+
+    if ( legToLift >= 0 ) {
+            offset[legToLift].z = high;
     }
 
 }
 
-void step_layer_1(int leg, int count)
+void step_layer_1(int leg, int count, double direction)
 {
     // leg order : 3, 2, 4, 1
+    count = (count + numPhase - legorder[leg]) % numPhase;
 
-    switch (leg) {
-        case 1:
-            count = ( count + 6 ) % 8;
-            break;
-        case 3:
-            count = ( count + 4 ) % 8;
-            break;
-        case 0:
-            count = ( count + 2 ) % 8;
-            break;
-    }
-
-    double step_size = 20;
+    double step_size = 30;
+    double xmov = step_size * sin(direction * PI/180);
+    double ymov = step_size * cos(direction * PI/180);
     if ( count < 2 ) {
-        offset[leg].y += (step_size / 2) * (count+1);
+        offset[leg].x += (xmov / 2) * (count+1);
+        offset[leg].y += (ymov / 2) * (count+1);
     } else {
         count = count - 2;
-        offset[leg].y += (-step_size / 6) * (count+1);
+        offset[leg].x += (-xmov / (numPhase - 2)) * (count+1);
+        offset[leg].y += (-ymov / (numPhase - 2)) * (count+1);
     }
 
 }
@@ -97,8 +169,8 @@ int main( int argc, char** argv )
         legs[i] = new DragoonLeg(i, 0, 0, 0);
     }
     
-    ros::Rate rate(2);
 
+    ros::Rate rate(4);
     ROS_INFO("Initialize legs");
     ros::spinOnce();
     rate.sleep();
@@ -134,8 +206,8 @@ int main( int argc, char** argv )
     rate.sleep();
     // Stand up
     for (int i = 0; i < 4; i++) {
-        legs[i]->setOriginZ(70);
-        legs[i]->moveRelative(0, 0, 0, 3);
+        legs[i]->setOriginZ(45);
+        legs[i]->moveRelative(0, 0, 0, 2);
     }
     ros::spinOnce();
     rate.sleep();
@@ -143,21 +215,38 @@ int main( int argc, char** argv )
 
     
     int count = 0;
-    double dur = 0.5;
+    int walk = 0;
+    double dur = 0.25;
+    double direction = 0.0;
     while (nh.ok() ) {
         memset(offset, 0, sizeof(offset));
-        
-        step_layer_0(count);
+       
+        step_layer_0(count, direction);
 
         for (int i=0; i < 4; i++ ) {
-            step_layer_1(i, count);
+            step_layer_1(i, count, direction);
             legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
         }
 
 
+        count++;
+        if ( count >= numPhase ) {
+            count = count % numPhase;
+            walk++;
+        }
+
+        if ( walk >= 5 ) {
+            walk = 0;
+            direction = direction + 90.0;
+            if ( direction >= 360.0 ) {
+                direction = 0;
+            }
+            ROS_INFO("Changing direction to %f", direction);
+            sleep(1);
+        }
+
         ros::spinOnce();
         rate.sleep();
-        count = (count + 1 ) %8;
     }
     
     

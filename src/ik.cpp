@@ -23,7 +23,7 @@ int getTheta(double x, double y, double z, double& theta1, double& theta2, doubl
     }
 
     double r = sqrt( (x*x) + (y*y) );
-    if ( r < 60 || r > 130 ) {
+    if ( r < 60 || r > 150 ) {
         // Range is too high
         ROS_ERROR("X,Y bad range");
         return -1;
