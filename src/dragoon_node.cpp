@@ -5,6 +5,7 @@
 
 #include <ros/ros.h>
 #include "trajectory_msgs/JointTrajectory.h"
+#include "geometry_msgs/Twist.h"
 #include "DragoonLeg.h"
 
 #define PI 3.14159265
@@ -28,6 +29,12 @@ static int legorder[4];
 static int numPhase = 10;
 static MoveState requestedState = MS_STOPPED;
 static double reqStepSize = 0;
+static double reqDirection = 0;
+
+double convertRadToDeg(double rad)
+{
+    return rad * 180 / PI;
+}
 
 void step_layer_0(int count, double direction)
 {
@@ -167,7 +174,41 @@ void step_layer_1(int leg, int count, double direction, double step_size)
 
 }
 
-void cmdCallback( const ros::MessageEvent<
+void cmdCallback( const ros::MessageEvent<geometry_msgs::Twist const>& event )
+{
+    const geometry_msgs::Twist& msg = *event.getMessage();
+
+    ROS_INFO("Twist msg : [%f %f %f] [%f %f %f]", 
+            msg.linear.x, 
+            msg.linear.y,
+            msg.linear.z,
+            msg.angular.x,
+            msg.angular.y,
+            msg.angular.z);
+    
+    double x = msg.linear.x;
+    double y = msg.linear.y;
+
+    double angle = convertRadToDeg( atan2(x, y) );
+    double length = sqrt(x*x + y*y);
+
+    ROS_INFO("Length : %lf Angle : %lf", length, angle);
+
+    if ( length < 1.0 ) {
+        reqStepSize = 0;
+        requestedState = MS_STOPPED;
+    } else if (length > 20 ) {
+        requestedState = MS_MOVING;
+        reqStepSize = 20;
+    }
+
+    if ( angle < 0.0 ) {
+        angle += 360.0;
+    }
+
+    reqDirection = angle;
+
+}
 
 int main( int argc, char** argv )
 {
@@ -182,6 +223,8 @@ int main( int argc, char** argv )
         legs[i] = new DragoonLeg(i, 0, 0, 0);
     }
     
+    // Setup subscribe
+    nh.subscribe<geometry_msgs::Twist>( "/dragoon_cmd", 1, cmdCallback ); 
     ros::Rate rate(4);
     ROS_INFO("Initialize legs");
     ros::spinOnce();
@@ -229,7 +272,8 @@ int main( int argc, char** argv )
     int count = 0;
     int walk = 0;
     double dur = 0.25;
-    double direction = 0.0;
+    double step_size = 0;
+    double direction = 0;
     MoveState state = MS_STOPPED;
     while (nh.ok() ) {
         memset(offset, 0, sizeof(offset));
@@ -238,8 +282,8 @@ int main( int argc, char** argv )
             step_layer_0(count, direction);
 
             for (int i=0; i < 4; i++ ) {
-                step_layer_1(i, count, direction);
-                legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur, reqStepSize);
+                step_layer_1(i, count, direction, step_size);
+                legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
             }
 
             count++;
@@ -248,10 +292,12 @@ int main( int argc, char** argv )
                 //walk++;
 
                 if ( requestedState == MS_STOPPED ) {
-                    state = MS_STOPPING 
+                    state = MS_STOPPING; 
                 } else {
                     state = requestedState;
                 }
+                step_size = reqStepSize;
+                direction = reqDirection;
             }
 
             //if ( walk >= 5 ) {
@@ -267,18 +313,22 @@ int main( int argc, char** argv )
             step_layer_0(count, direction);
 
             for (int i=0; i < 4; i++ ) {
-                step_layer_1(i, count, direction);
-                legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur, 0);
+                step_layer_1(i, count, direction, 0);
+                legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
             }
 
             count++;
             if ( count >= numPhase ) {
                 count = count % numPhase;
                 state = requestedState;
+                step_size = reqStepSize;
+                direction = reqDirection;
             }
 
         } else if ( state == MS_STOPPED ) {
             state = requestedState;
+            step_size = reqStepSize;
+            direction = reqDirection;
         }
 
         ros::spinOnce();
