@@ -1,6 +1,11 @@
+// TODO
+// 1. Implement stop - one empty cycle of moving legs back to origin
+// 2. Implement subscriber mechanism - listen to direction/speed pair.
+
 
 #include <ros/ros.h>
 #include "trajectory_msgs/JointTrajectory.h"
+#include "geometry_msgs/Twist.h"
 #include "DragoonLeg.h"
 
 #define PI 3.14159265
@@ -12,9 +17,24 @@ struct LegOffset
     double z;
 };
 
+enum MoveState
+{
+    MS_STOPPED,
+    MS_STOPPING,
+    MS_MOVING
+} typedef MoveState;
+
 static struct LegOffset offset[4];
 static int legorder[4];
 static int numPhase = 10;
+static MoveState requestedState = MS_STOPPED;
+static double reqStepSize = 0;
+static double reqDirection = 0;
+
+double convertRadToDeg(double rad)
+{
+    return rad * 180 / PI;
+}
 
 void step_layer_0(int count, double direction)
 {
@@ -136,12 +156,11 @@ void step_layer_0(int count, double direction)
 
 }
 
-void step_layer_1(int leg, int count, double direction)
+void step_layer_1(int leg, int count, double direction, double step_size)
 {
     // leg order : 3, 2, 4, 1
     count = (count + numPhase - legorder[leg]) % numPhase;
 
-    double step_size = 30;
     double xmov = step_size * sin(direction * PI/180);
     double ymov = step_size * cos(direction * PI/180);
     if ( count < 2 ) {
@@ -155,6 +174,42 @@ void step_layer_1(int leg, int count, double direction)
 
 }
 
+void cmdCallback( const ros::MessageEvent<geometry_msgs::Twist const>& event )
+{
+    const geometry_msgs::Twist& msg = *event.getMessage();
+
+    ROS_INFO("Twist msg : [%f %f %f] [%f %f %f]", 
+            msg.linear.x, 
+            msg.linear.y,
+            msg.linear.z,
+            msg.angular.x,
+            msg.angular.y,
+            msg.angular.z);
+    
+    double x = msg.linear.x;
+    double y = msg.linear.y;
+
+    double angle = convertRadToDeg( atan2(x, y) );
+    double length = sqrt(x*x + y*y);
+
+    ROS_INFO("Length : %lf Angle : %lf", length, angle);
+
+    if ( length < 1.0 ) {
+        reqStepSize = 0;
+        requestedState = MS_STOPPED;
+    } else if (length > 20 ) {
+        requestedState = MS_MOVING;
+        reqStepSize = 20;
+    }
+
+    if ( angle < 0.0 ) {
+        angle += 360.0;
+    }
+
+    reqDirection = angle;
+
+}
+
 int main( int argc, char** argv )
 {
     ros::init( argc, argv, "dragoon_node" );
@@ -162,14 +217,14 @@ int main( int argc, char** argv )
 
     DragoonLeg *legs[4];
     
-    // Setup legs
-    
+    // Instantiate legs
     ROS_INFO("Advertising topics");
     for (int i = 0; i < 4; i++) {
         legs[i] = new DragoonLeg(i, 0, 0, 0);
     }
     
-
+    // Setup subscribe
+    nh.subscribe<geometry_msgs::Twist>( "/dragoon_cmd", 1, cmdCallback ); 
     ros::Rate rate(4);
     ROS_INFO("Initialize legs");
     ros::spinOnce();
@@ -217,32 +272,63 @@ int main( int argc, char** argv )
     int count = 0;
     int walk = 0;
     double dur = 0.25;
-    double direction = 0.0;
+    double step_size = 0;
+    double direction = 0;
+    MoveState state = MS_STOPPED;
     while (nh.ok() ) {
         memset(offset, 0, sizeof(offset));
-       
-        step_layer_0(count, direction);
 
-        for (int i=0; i < 4; i++ ) {
-            step_layer_1(i, count, direction);
-            legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
-        }
+        if ( state == MS_MOVING ) {
+            step_layer_0(count, direction);
 
-
-        count++;
-        if ( count >= numPhase ) {
-            count = count % numPhase;
-            walk++;
-        }
-
-        if ( walk >= 5 ) {
-            walk = 0;
-            direction = direction + 90.0;
-            if ( direction >= 360.0 ) {
-                direction = 0;
+            for (int i=0; i < 4; i++ ) {
+                step_layer_1(i, count, direction, step_size);
+                legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
             }
-            ROS_INFO("Changing direction to %f", direction);
-            sleep(1);
+
+            count++;
+            if ( count >= numPhase ) {
+                count = count % numPhase;
+                //walk++;
+
+                if ( requestedState == MS_STOPPED ) {
+                    state = MS_STOPPING; 
+                } else {
+                    state = requestedState;
+                }
+                step_size = reqStepSize;
+                direction = reqDirection;
+            }
+
+            //if ( walk >= 5 ) {
+            //    walk = 0;
+            //    direction = direction + 90.0;
+            //    if ( direction >= 360.0 ) {
+            //        direction = 0;
+            //    }
+            //    ROS_INFO("Changing direction to %f", direction);
+            //    sleep(1);
+            //}
+        } else if ( state == MS_STOPPING ) {
+            step_layer_0(count, direction);
+
+            for (int i=0; i < 4; i++ ) {
+                step_layer_1(i, count, direction, 0);
+                legs[i]->moveRelative(offset[i].x, offset[i].y, offset[i].z, dur);
+            }
+
+            count++;
+            if ( count >= numPhase ) {
+                count = count % numPhase;
+                state = requestedState;
+                step_size = reqStepSize;
+                direction = reqDirection;
+            }
+
+        } else if ( state == MS_STOPPED ) {
+            state = requestedState;
+            step_size = reqStepSize;
+            direction = reqDirection;
         }
 
         ros::spinOnce();
