@@ -6,6 +6,7 @@ project(dragoon_quad)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  rospy
   trajectory_msgs
   std_msgs
   geometry_msgs
@@ -107,6 +108,11 @@ add_library(DragoonLeg
     src/DragoonLeg.cpp
 )
 
+add_library(Gait
+    src/Gait.cpp
+    src/CreepGait.cpp
+)
+
 ## Declare a cpp executable
 add_executable(dragoon_node src/dragoon_node.cpp)
 
@@ -116,7 +122,7 @@ add_executable(dragoon_node src/dragoon_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(dragoon_node
-    DragoonLeg ik ${catkin_LIBRARIES}
+    DragoonLeg ik Gait ${catkin_LIBRARIES}
 )
 
 #############
@@ -128,10 +134,10 @@ target_link_libraries(dragoon_node
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+catkin_install_python(PROGRAMS
+  scripts/dragoon_control
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark executables and/or libraries for installation
 install(TARGETS ik dragoon_node
@@ -165,3 +171,4 @@ install(TARGETS ik dragoon_node
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
